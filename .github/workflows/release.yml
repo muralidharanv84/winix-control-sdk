@@ -42,8 +42,21 @@ jobs:
           curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
             | jq -e '.value' >/dev/null
-      - name: Publish to npm (trusted publishing)
+      - name: Check if package version already exists on npm
+        id: npm_version
         if: steps.changesets.outputs.hasChangesets == 'false'
+        run: |
+          PACKAGE_NAME="$(node -p "require('./package.json').name")"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "Package ${PACKAGE_NAME}@${PACKAGE_VERSION} is already published; skipping publish."
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+            echo "Package ${PACKAGE_NAME}@${PACKAGE_VERSION} is not published yet; proceeding."
+          fi
+      - name: Publish to npm (trusted publishing)
+        if: steps.changesets.outputs.hasChangesets == 'false' && steps.npm_version.outputs.already_published != 'true'
         run: |
           npm run build
           npm publish --access public --provenance
