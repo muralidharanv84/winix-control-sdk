@@ -1,5 +1,11 @@
 # winix-control-sdk
 
+## 0.2.1
+
+### Patch Changes
+
+- f451950: Publish a patch release that includes the latest auth/account documentation updates and release workflow stability fixes.
+
 ## 0.2.0
 
 ### Minor Changes
