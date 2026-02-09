@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -34,11 +34,16 @@ jobs:
           version: npm run version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify OIDC availability for npm trusted publishing
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        run: |
+          test -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}"
+          test -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}"
+          curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
+            | jq -e '.value' >/dev/null
       - name: Publish to npm (trusted publishing)
         if: steps.changesets.outputs.hasChangesets == 'false'
         run: |
-          npm config delete //registry.npmjs.org/:_authToken || true
-          npm config delete always-auth || true
-          echo "OIDC request URL present: ${ACTIONS_ID_TOKEN_REQUEST_URL:+yes}"
           npm run build
-          npm publish --access public --provenance --registry=https://registry.npmjs.org
+          npm publish --access public --provenance
