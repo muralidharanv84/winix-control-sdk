@@ -1,0 +1,81 @@
+{
+  "name": "winix-control-sdk",
+  "version": "0.1.0",
+  "description": "Worker-safe Winix auth/session/device SDK with PM2.5 control utilities",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Murali",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/muralidharanv84/winix-control-sdk.git"
+  },
+  "homepage": "https://github.com/muralidharanv84/winix-control-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/muralidharanv84/winix-control-sdk/issues"
+  },
+  "keywords": [
+    "winix",
+    "air-purifier",
+    "cloudflare-workers",
+    "cognito",
+    "srp",
+    "pm25"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./auth": {
+      "types": "./dist/auth.d.ts",
+      "import": "./dist/auth.js"
+    },
+    "./account": {
+      "types": "./dist/account.d.ts",
+      "import": "./dist/account.js"
+    },
+    "./device": {
+      "types": "./dist/device.d.ts",
+      "import": "./dist/device.js"
+    },
+    "./control": {
+      "types": "./dist/control.d.ts",
+      "import": "./dist/control.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "changeset": "changeset",
+    "version": "changeset version"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.7",
+    "@eslint/js": "^9.36.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.36.0",
+    "globals": "^16.4.0",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.44.0",
+    "vitest": "^3.2.4"
+  }
+}
