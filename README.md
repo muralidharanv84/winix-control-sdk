@@ -40,20 +40,6 @@ for (const device of session.devices) {
 }
 ```
 
-## Control Utility Example
-
-```ts
-import { computeTargetSpeed, isWindowStale } from "winix-control-sdk";
-
-if (!isWindowStale(sampleCount, lastSampleTs, nowTs, 3, 360)) {
-  const targetSpeed = computeTargetSpeed(pm25Avg, previousSpeed, previousChangeTs, nowTs, {
-    deadbandUgm3: 2,
-    minDwellSeconds: 600,
-  });
-  // apply targetSpeed in your own orchestration code
-}
-```
-
 ## Cloudflare Worker Example
 
 ```ts
@@ -75,11 +61,10 @@ async function run(env: Env): Promise<void> {
 
 ## Public API
 
-- Types: `FanSpeed`, `WinixPowerState`, `WinixModeState`, `StoredWinixAuthState`, `WinixDeviceSummary`, `WinixDeviceState`, `WinixResolvedSession`, `ControlPolicy`
+- Types: `FanSpeed`, `WinixPowerState`, `WinixModeState`, `StoredWinixAuthState`, `WinixDeviceSummary`, `WinixDeviceState`, `WinixResolvedSession`
 - Auth: `resolveWinixAuthState`, `defaultWinixAuthProvider`
 - Session: `resolveWinixSession`, `defaultWinixAccountProvider`
 - Device: `defaultWinixDeviceClient`
-- Control: `mapPm25ToSpeed`, `chooseHysteresisSpeed`, `applyDwell`, `isWindowStale`, `computeTargetSpeed`, `DEFAULT_CONTROL_POLICY`
 - Constants: `WINIX_REFRESH_MARGIN_SECONDS`
 
 ## Development

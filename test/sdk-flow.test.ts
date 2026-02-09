@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  computeTargetSpeed,
   defaultWinixDeviceClient,
   resolveWinixSession,
 } from "../src/index";
@@ -56,14 +55,9 @@ describe("sdk integration flow", () => {
       .mockResolvedValue(new Response("ok", { status: 200 }));
 
     const session = await resolveWinixSession("u@example.com", authState());
-    const target = computeTargetSpeed(35, "low", 1000, 2000, {
-      deadbandUgm3: 2,
-      minDwellSeconds: 60,
-    });
+    const target = "turbo" as const;
 
     expect(session.devices[0]?.deviceId).toBe("device-1");
-    expect(target).toBe("turbo");
-
     const current = await defaultWinixDeviceClient.getState("device-1");
     if (current.power !== "on") await defaultWinixDeviceClient.setPowerOn("device-1");
     if (current.mode !== "manual") await defaultWinixDeviceClient.setModeManual("device-1");

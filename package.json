@@ -1,7 +1,7 @@
 {
   "name": "winix-control-sdk",
   "version": "0.1.0",
-  "description": "Worker-safe Winix auth/session/device SDK with PM2.5 control utilities",
+  "description": "Worker-safe Winix auth/session/device SDK",
   "type": "module",
   "license": "Apache-2.0",
   "author": "Murali",
@@ -19,7 +19,7 @@
     "cloudflare-workers",
     "cognito",
     "srp",
-    "pm25"
+    "iot"
   ],
   "engines": {
     "node": ">=20"
@@ -45,10 +45,6 @@
     "./device": {
       "types": "./dist/device.d.ts",
       "import": "./dist/device.js"
-    },
-    "./control": {
-      "types": "./dist/control.d.ts",
-      "import": "./dist/control.js"
     },
     "./types": {
       "types": "./dist/types.d.ts",
