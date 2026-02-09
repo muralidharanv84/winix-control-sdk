@@ -96,3 +96,13 @@ npm run build
 ## Release
 
 This repo uses [Changesets](https://github.com/changesets/changesets) and GitHub Actions for release automation.
+
+Release publishing is configured for npm Trusted Publishing (OIDC), so no long-lived `NPM_TOKEN` secret is required in GitHub Actions.
+
+One-time npm setup:
+
+1. In npm package settings for `winix-control-sdk`, add a trusted publisher.
+2. Provider: GitHub Actions
+3. Repository: `muralidharanv84/winix-control-sdk`
+4. Workflow file: `.github/workflows/release.yml`
+5. Environment: leave empty (unless you explicitly use one)

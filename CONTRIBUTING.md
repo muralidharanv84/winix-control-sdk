@@ -19,4 +19,4 @@
 - Create a changeset with `npm run changeset`.
 - Open PR.
 - Merge PR after CI is green.
-- Release workflow publishes versions from merged changesets.
+- Release workflow publishes versions from merged changesets using npm Trusted Publishing (OIDC).
