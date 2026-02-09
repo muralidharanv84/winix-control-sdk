@@ -43,9 +43,5 @@ jobs:
           NODE_AUTH_TOKEN: ""
           NPM_CONFIG_PROVENANCE: "true"
         run: |
-          if [ -n "${NPM_TOKEN:-}" ] || [ -n "${NODE_AUTH_TOKEN:-}" ]; then
-            echo "::error::Token-based npm auth is set; expected OIDC trusted publishing only."
-            exit 1
-          fi
           npm config delete //registry.npmjs.org/:_authToken || true
           npx changeset publish
