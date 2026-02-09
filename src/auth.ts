@@ -15,6 +15,7 @@ export interface WinixAuthProvider {
 const AUTH_ENDPOINT = `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/`;
 const PASSWORD_VERIFIER_CHALLENGE = "PASSWORD_VERIFIER";
 
+// RFC 5054 2048-bit group parameters used by Cognito's SRP flow.
 const N_HEX =
   "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1" +
   "29024E088A67CC74020BBEA63B139B22514A08798E3404DD" +
@@ -104,6 +105,7 @@ function concatBytes(...parts: Uint8Array[]): Uint8Array {
 function padHex(value: bigint | string): string {
   let hex = typeof value === "bigint" ? value.toString(16) : value;
   if (hex.length % 2 === 1) hex = `0${hex}`;
+  // Preserve positive sign when value is interpreted as ASN.1-style bytes.
   const first = hex[0]?.toLowerCase();
   if (["8", "9", "a", "b", "c", "d", "e", "f"].includes(first)) {
     hex = `00${hex}`;
@@ -197,6 +199,7 @@ async function computePasswordAuthenticationKey(
   serverBHex: string,
   saltHex: string,
 ): Promise<Uint8Array> {
+  // Reproduce Cognito SRP key derivation (u, x, S -> HKDF -> 16-byte key).
   const serverB = BigInt(`0x${serverBHex}`);
   const salt = BigInt(`0x${saltHex}`);
   const uValue = BigInt(
@@ -260,6 +263,7 @@ async function loginWithSrp(
   username: string,
   password: string,
 ): Promise<StoredWinixAuthState> {
+  // Step 1: start SRP auth and receive PASSWORD_VERIFIER challenge parameters.
   const smallA = randomBigInt(128) % BIG_N;
   const largeA = powMod(BIG_G, smallA, BIG_N);
   if (largeA % BIG_N === 0n) {
@@ -292,6 +296,7 @@ async function loginWithSrp(
     throw new Error("Cognito challenge is missing SRP parameters");
   }
 
+  // Step 2: derive SRP session key, sign challenge payload, and respond.
   const timestamp = formattedTimestamp(new Date());
   const hkdf = await computePasswordAuthenticationKey(
     smallA,
@@ -395,6 +400,7 @@ export async function resolveWinixAuthState(
   try {
     return await provider.refresh(stored.refreshToken, stored.userId);
   } catch {
+    // Refresh tokens can be revoked/expired; fall back to full login.
     return provider.login(username, password);
   }
 }

@@ -22,6 +22,12 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Prepare clean npm config
+        run: |
+          cat > "$RUNNER_TEMP/.npmrc" <<'EOF'
+          provenance=true
+          EOF
+          echo "NPM_CONFIG_USERCONFIG=$RUNNER_TEMP/.npmrc" >> "$GITHUB_ENV"
       - name: Ensure npm supports trusted publishing
         run: |
           npm install -g npm@latest
@@ -39,11 +45,23 @@ jobs:
         run: |
           test -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}"
           test -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}"
-          curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          OIDC_TOKEN="$(curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
-            | jq -e '.value' >/dev/null
+            | jq -r '.value')"
+          python - <<'PY'
+import base64, json, os
+tok = os.environ["OIDC_TOKEN"]
+payload = tok.split(".")[1]
+payload += "=" * (-len(payload) % 4)
+data = json.loads(base64.urlsafe_b64decode(payload.encode()))
+for key in ("repository", "ref", "workflow", "job_workflow_ref", "workflow_ref"):
+    print(f"{key}: {data.get(key)}")
+PY
+        env:
+          OIDC_TOKEN: ${{ env.OIDC_TOKEN }}
       - name: Publish to npm (trusted publishing)
         if: steps.changesets.outputs.hasChangesets == 'false'
         run: |
+          npm config delete always-auth || true
           npm run build
           npm publish --access public --provenance

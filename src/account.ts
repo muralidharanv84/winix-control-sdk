@@ -18,6 +18,7 @@ type WinixApiBaseResponse = {
   resultMessage?: string;
 };
 
+// Winix derives a pseudo-device UUID from CRC32 hashes of user-linked strings.
 const CRC32_TABLE = (() => {
   const table = new Uint32Array(256);
   for (let i = 0; i < 256; i += 1) {
@@ -60,6 +61,7 @@ function decodeJwtSub(token: string): string {
 }
 
 function buildWinixUuid(accessToken: string): string {
+  // Mirror the mobile-app UUID strategy so backend account calls are accepted.
   const userId = decodeJwtSub(accessToken);
   const p1 = crc32(utf8(`github.com/hfern/winixctl${userId}`));
   const p2 = crc32(utf8(`HGF${userId}`));
@@ -157,6 +159,7 @@ export const defaultWinixAccountProvider: WinixAccountProvider = {
     auth: StoredWinixAuthState,
   ): Promise<WinixAccountHandle> {
     const uuid = buildWinixUuid(auth.accessToken);
+    // The API expects registration/check before requesting device inventory.
     await registerUser(auth.accessToken, username, uuid);
     await checkAccessToken(auth.accessToken, uuid);
 
