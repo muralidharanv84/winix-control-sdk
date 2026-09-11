@@ -24,3 +24,12 @@ jobs:
       - run: npm test
       - run: npm run test:coverage
       - run: npm run build
+
+  deno-example:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx --yes deno@2.9.6 check --config=examples/deno/deno.json examples/deno/list-devices.ts

@@ -9,6 +9,14 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    files: ["examples/**/*.mjs", "test/**/*.mjs"],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    files: ["examples/deno/**/*.ts"],
+    languageOptions: { globals: { Deno: "readonly" } },
+  },
+  {
     files: ["**/*.ts"],
     languageOptions: {
       ecmaVersion: 2022,

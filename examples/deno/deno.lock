@@ -1,0 +1,11 @@
+{
+  "version": "5",
+  "specifiers": {
+    "npm:winix-control-sdk@0.3.0": "0.3.0"
+  },
+  "npm": {
+    "winix-control-sdk@0.3.0": {
+      "integrity": "sha512-U5BIoZOxGFMtkgGr1Nm3TG3xaljGBrlrHEsFa18eaTzd3+r+P/PDC4Hnc9M9nTyPzcW46JiQBZylN2VP+2FstQ=="
+    }
+  }
+}
