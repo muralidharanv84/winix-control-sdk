@@ -1,5 +1,12 @@
 # winix-control-sdk
 
+## 0.3.1
+
+### Patch Changes
+
+- Add runnable Node.js, Deno, and AWS Lambda examples with setup, device selection,
+  and token-cache guidance. Include the examples in the npm distribution.
+
 ## 0.3.0
 
 ### Minor Changes

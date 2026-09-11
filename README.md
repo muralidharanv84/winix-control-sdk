@@ -2,7 +2,8 @@
 
 Winix authentication, account sessions, and purifier control with no runtime dependencies.
 
-This package is designed for Cloudflare Workers and other modern runtimes with `fetch`, `crypto.subtle`, and `BigInt` support.
+Use it from Node.js scripts, Deno, AWS Lambda, Cloudflare Workers, or other modern
+server runtimes with `fetch`, `crypto.subtle`, and `BigInt` support.
 
 ## Disclaimer
 
@@ -16,7 +17,7 @@ npm install winix-control-sdk
 
 ## Runtime Requirements
 
-- Node.js 20+ (for local scripts/tests)
+- Node.js 20+, Deno 2, or a compatible server runtime
 - Runtime support for `fetch`, `atob`/`btoa`, `crypto.subtle`, and `BigInt`
 
 ## Quick Start
@@ -41,7 +42,15 @@ for (const device of session.devices) {
 }
 ```
 
-## Cloudflare Worker Example
+## Runnable Examples
+
+See the [examples guide](examples/README.md) for setup and complete source files:
+
+- [Node.js CLI](examples/node/control.mjs): list purifiers and control a selected device from a terminal or Raspberry Pi.
+- [Deno](examples/deno/list-devices.ts): discover devices and read state using a direct npm import.
+- [AWS Lambda](examples/aws-lambda/index.mjs): read or control one configured purifier, with token reuse between warm invocations.
+
+### Cloudflare Worker
 
 ```ts
 import { resolveWinixAuthState, resolveWinixSession } from "winix-control-sdk";
