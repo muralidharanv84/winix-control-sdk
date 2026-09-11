@@ -1,6 +1,6 @@
 export { resolveWinixAuthState, defaultWinixAuthProvider } from "./auth.js";
 export { resolveWinixSession, defaultWinixAccountProvider } from "./account.js";
-export { defaultWinixDeviceClient } from "./device.js";
+export { createWinixDeviceClient } from "./device.js";
 export { WINIX_REFRESH_MARGIN_SECONDS } from "./constants.js";
 
 export type { WinixAuthProvider } from "./auth.js";

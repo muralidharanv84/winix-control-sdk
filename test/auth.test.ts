@@ -11,6 +11,7 @@ function buildAuth(overrides: Partial<StoredWinixAuthState> = {}): StoredWinixAu
   return {
     userId: "user-1",
     accessToken: "access-1",
+    idToken: "id-1",
     refreshToken: "refresh-1",
     accessExpiresAt: 10_000,
     ...overrides,
@@ -22,6 +23,18 @@ afterEach(() => {
 });
 
 describe("resolveWinixAuthState", () => {
+  it.each([false, true])("migrates legacy tokens without an ID token (revoked=%s)", async (revoked) => {
+    const provider: WinixAuthProvider = {
+      login: vi.fn().mockResolvedValue(buildAuth({ refreshToken: "new-refresh" })),
+      refresh: revoked
+        ? vi.fn().mockRejectedValue(new Error("Invalid Refresh Token"))
+        : vi.fn().mockResolvedValue(buildAuth()),
+    };
+    const result = await resolveWinixAuthState("u@example.com", "pw", buildAuth({ idToken: null }), 1_000, provider);
+    expect(result.idToken).toBe("id-1");
+    expect(provider.refresh).toHaveBeenCalledWith("refresh-1", "user-1");
+    expect(provider.login).toHaveBeenCalledTimes(revoked ? 1 : 0);
+  });
   it("uses login when there is no stored auth", async () => {
     const provider: WinixAuthProvider = {
       login: vi.fn().mockResolvedValue(buildAuth({ accessToken: "new-access" })),
@@ -101,12 +114,33 @@ describe("resolveWinixAuthState", () => {
 });
 
 describe("defaultWinixAuthProvider", () => {
+  it.each([
+    [400, { message: "Invalid Refresh Token" }, "Invalid Refresh Token"],
+    [200, { __type: "NotAuthorizedException" }, "NotAuthorizedException"],
+  ])("propagates Cognito failures (%s)", async (status, body, message) => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(body, { status }));
+    await expect(defaultWinixAuthProvider.refresh("old-token", "user-1")).rejects.toThrow(message);
+  });
+
+  it("rejects an invalid SRP server public value", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({
+      ChallengeName: "PASSWORD_VERIFIER",
+      ChallengeParameters: { USER_ID_FOR_SRP: "user", SALT: "ab", SRP_B: "0", SECRET_BLOCK: "YQ==" },
+    }));
+    await expect(defaultWinixAuthProvider.login("u@example.com", "pw")).rejects.toThrow("safety check for B");
+  });
+
+  it("rejects a challenge without SRP parameters", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ChallengeName: "PASSWORD_VERIFIER" }));
+    await expect(defaultWinixAuthProvider.login("u@example.com", "pw")).rejects.toThrow("missing SRP parameters");
+  });
   it("refreshes access token via Cognito REFRESH_TOKEN flow", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(
         JSON.stringify({
           AuthenticationResult: {
             AccessToken: "access-2",
+            IdToken: "id-2",
             ExpiresIn: 3600,
           },
         }),
@@ -117,6 +151,10 @@ describe("defaultWinixAuthProvider", () => {
     const auth = await defaultWinixAuthProvider.refresh("refresh-1", "user-1");
 
     expect(auth.accessToken).toBe("access-2");
+    expect(auth.idToken).toBe("id-2");
+    const requestBody = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body));
+    expect(requestBody.ClientId).toBe("5rjk59c5tt7k9g8gpj0vd2qfg9");
+    expect(requestBody.AuthParameters).toEqual({ REFRESH_TOKEN: "refresh-1" });
     expect(auth.refreshToken).toBe("refresh-1");
     expect(auth.userId).toBe("user-1");
     expect(auth.accessExpiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
@@ -138,17 +176,18 @@ describe("defaultWinixAuthProvider", () => {
 
     await expect(
       defaultWinixAuthProvider.refresh("refresh-1", "user-1"),
-    ).rejects.toThrow("did not return an access token");
+    ).rejects.toThrow("did not return complete auth tokens");
   });
 
   it("completes SRP login with mocked Cognito challenge/response", async () => {
     const accessToken = buildJwt("sub-user-1");
 
-    vi.spyOn(globalThis, "fetch")
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
             ChallengeName: "PASSWORD_VERIFIER",
+            Session: "challenge-session",
             ChallengeParameters: {
               USER_ID_FOR_SRP: "srp-user",
               SALT: "deadbeef",
@@ -165,6 +204,7 @@ describe("defaultWinixAuthProvider", () => {
           JSON.stringify({
             AuthenticationResult: {
               AccessToken: accessToken,
+              IdToken: "id-2",
               RefreshToken: "refresh-2",
               ExpiresIn: 3600,
             },
@@ -178,6 +218,14 @@ describe("defaultWinixAuthProvider", () => {
     expect(auth.userId).toBe("sub-user-1");
     expect(auth.refreshToken).toBe("refresh-2");
     expect(auth.accessToken).toBe(accessToken);
+    expect(auth.idToken).toBe("id-2");
+    const initiate = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body));
+    const challenge = JSON.parse(String(fetchSpy.mock.calls[1][1]?.body));
+    expect(initiate.ClientId).toBe("5rjk59c5tt7k9g8gpj0vd2qfg9");
+    expect(initiate.AuthParameters.SECRET_HASH).toBeUndefined();
+    expect(challenge.Session).toBe("challenge-session");
+    expect(challenge.ChallengeResponses.USERNAME).toBe("srp-user");
+    expect(challenge.ChallengeResponses.SECRET_HASH).toBeUndefined();
   });
 
   it("fails login when challenge name is unexpected", async () => {

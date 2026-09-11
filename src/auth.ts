@@ -1,6 +1,5 @@
 import {
   COGNITO_APP_CLIENT_ID,
-  COGNITO_CLIENT_SECRET_KEY,
   COGNITO_REGION,
   COGNITO_USER_POOL_ID,
   WINIX_REFRESH_MARGIN_SECONDS,
@@ -15,7 +14,7 @@ export interface WinixAuthProvider {
 const AUTH_ENDPOINT = `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/`;
 const PASSWORD_VERIFIER_CHALLENGE = "PASSWORD_VERIFIER";
 
-// RFC 5054 2048-bit group parameters used by Cognito's SRP flow.
+// Cognito's 3072-bit SRP group parameters.
 const N_HEX =
   "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1" +
   "29024E088A67CC74020BBEA63B139B22514A08798E3404DD" +
@@ -115,7 +114,7 @@ function padHex(value: bigint | string): string {
 
 function powMod(base: bigint, exponent: bigint, modulus: bigint): bigint {
   let result = 1n;
-  let current = base % modulus;
+  let current = ((base % modulus) + modulus) % modulus;
   let exp = exponent;
   while (exp > 0n) {
     if (exp % 2n === 1n) result = (result * current) % modulus;
@@ -185,12 +184,6 @@ async function hmacSha256(
   return new Uint8Array(signature);
 }
 
-async function computeSecretHash(username: string): Promise<string> {
-  const message = utf8(`${username}${COGNITO_APP_CLIENT_ID}`);
-  const key = utf8(COGNITO_CLIENT_SECRET_KEY);
-  return bytesToBase64(await hmacSha256(key, message));
-}
-
 async function computePasswordAuthenticationKey(
   smallA: bigint,
   largeA: bigint,
@@ -201,6 +194,9 @@ async function computePasswordAuthenticationKey(
 ): Promise<Uint8Array> {
   // Reproduce Cognito SRP key derivation (u, x, S -> HKDF -> 16-byte key).
   const serverB = BigInt(`0x${serverBHex}`);
+  if (serverB % BIG_N === 0n) {
+    throw new Error("Winix auth failed: SRP safety check for B failed");
+  }
   const salt = BigInt(`0x${saltHex}`);
   const uValue = BigInt(
     `0x${await hexHash(`${padHex(largeA)}${padHex(serverB)}`)}`,
@@ -255,6 +251,7 @@ async function cognitoRequest(
 
 type CognitoAuthResult = {
   AccessToken: string;
+  IdToken: string;
   RefreshToken?: string;
   ExpiresIn: number;
 };
@@ -278,7 +275,6 @@ async function loginWithSrp(
       AuthParameters: {
         USERNAME: username,
         SRP_A: largeA.toString(16),
-        SECRET_HASH: await computeSecretHash(username),
       },
     },
   );
@@ -287,7 +283,7 @@ async function loginWithSrp(
     throw new Error(`Unexpected Cognito challenge: ${String(initiate.ChallengeName)}`);
   }
 
-  const challengeParams = initiate.ChallengeParameters as Record<string, string>;
+  const challengeParams = (initiate.ChallengeParameters ?? {}) as Record<string, string>;
   const userIdForSrp = challengeParams.USER_ID_FOR_SRP;
   const saltHex = challengeParams.SALT;
   const srpBHex = challengeParams.SRP_B;
@@ -321,24 +317,25 @@ async function loginWithSrp(
     {
       ChallengeName: PASSWORD_VERIFIER_CHALLENGE,
       ClientId: COGNITO_APP_CLIENT_ID,
+      ...(typeof initiate.Session === "string" ? { Session: initiate.Session } : {}),
       ChallengeResponses: {
         TIMESTAMP: timestamp,
-        USERNAME: username,
+        USERNAME: userIdForSrp,
         PASSWORD_CLAIM_SECRET_BLOCK: secretBlock,
         PASSWORD_CLAIM_SIGNATURE: signature,
-        SECRET_HASH: await computeSecretHash(username),
       },
     },
   );
 
   const result = challenge.AuthenticationResult as CognitoAuthResult | undefined;
-  if (!result?.AccessToken || !result?.RefreshToken || !result?.ExpiresIn) {
+  if (!result?.AccessToken || !result?.IdToken || !result?.RefreshToken || !result?.ExpiresIn) {
     throw new Error("Cognito login did not return complete auth tokens");
   }
 
   return {
     userId: decodeJwtSub(result.AccessToken),
     accessToken: result.AccessToken,
+    idToken: result.IdToken,
     refreshToken: result.RefreshToken,
     accessExpiresAt: Math.floor(Date.now() / 1000) + result.ExpiresIn,
   };
@@ -355,19 +352,19 @@ async function refreshAccessToken(
       AuthFlow: "REFRESH_TOKEN",
       AuthParameters: {
         REFRESH_TOKEN: refreshToken,
-        SECRET_HASH: await computeSecretHash(userId),
       },
     },
   );
 
   const result = response.AuthenticationResult as CognitoAuthResult | undefined;
-  if (!result?.AccessToken || !result?.ExpiresIn) {
-    throw new Error("Cognito refresh did not return an access token");
+  if (!result?.AccessToken || !result?.IdToken || !result?.ExpiresIn) {
+    throw new Error("Cognito refresh did not return complete auth tokens");
   }
 
   return {
     userId,
     accessToken: result.AccessToken,
+    idToken: result.IdToken,
     refreshToken,
     accessExpiresAt: Math.floor(Date.now() / 1000) + result.ExpiresIn,
   };
@@ -379,7 +376,7 @@ export const defaultWinixAuthProvider: WinixAuthProvider = {
 };
 
 function isAccessTokenFresh(stored: StoredWinixAuthState, nowSec: number): boolean {
-  return stored.accessExpiresAt > nowSec + WINIX_REFRESH_MARGIN_SECONDS;
+  return Boolean(stored.idToken) && stored.accessExpiresAt > nowSec + WINIX_REFRESH_MARGIN_SECONDS;
 }
 
 export async function resolveWinixAuthState(

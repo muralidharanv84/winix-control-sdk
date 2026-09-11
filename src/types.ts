@@ -6,6 +6,8 @@ export type WinixModeState = "auto" | "manual";
 export interface StoredWinixAuthState {
   userId: string;
   accessToken: string;
+  // Optional only for caches written by older SDK releases; refreshed before use.
+  idToken?: string | null;
   refreshToken: string;
   accessExpiresAt: number; // epoch seconds
 }
@@ -24,5 +26,6 @@ export interface WinixDeviceState {
 
 export interface WinixResolvedSession {
   auth: StoredWinixAuthState;
+  identityId: string;
   devices: WinixDeviceSummary[];
 }
