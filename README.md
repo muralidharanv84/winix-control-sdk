@@ -1,6 +1,6 @@
 # winix-control-sdk
 
-Worker-safe Winix SDK and PM2.5 control utilities.
+Winix authentication, account sessions, and purifier control with no runtime dependencies.
 
 This package is designed for Cloudflare Workers and other modern runtimes with `fetch`, `crypto.subtle`, and `BigInt` support.
 
@@ -25,18 +25,19 @@ npm install winix-control-sdk
 import {
   resolveWinixAuthState,
   resolveWinixSession,
-  defaultWinixDeviceClient,
+  createWinixDeviceClient,
 } from "winix-control-sdk";
 
 const nowSec = Math.floor(Date.now() / 1000);
 const auth = await resolveWinixAuthState(username, password, cachedAuth, nowSec);
 const session = await resolveWinixSession(username, auth);
+const client = createWinixDeviceClient(session.identityId);
 
 for (const device of session.devices) {
-  const state = await defaultWinixDeviceClient.getState(device.deviceId);
-  if (state.power !== "on") await defaultWinixDeviceClient.setPowerOn(device.deviceId);
-  if (state.mode !== "manual") await defaultWinixDeviceClient.setModeManual(device.deviceId);
-  await defaultWinixDeviceClient.setAirflow(device.deviceId, "medium");
+  const state = await client.getState(device.deviceId);
+  if (state.power !== "on") await client.setPowerOn(device.deviceId);
+  if (state.mode !== "manual") await client.setModeManual(device.deviceId);
+  await client.setAirflow(device.deviceId, "medium");
 }
 ```
 
@@ -64,8 +65,26 @@ async function run(env: Env): Promise<void> {
 - Types: `FanSpeed`, `WinixPowerState`, `WinixModeState`, `StoredWinixAuthState`, `WinixDeviceSummary`, `WinixDeviceState`, `WinixResolvedSession`
 - Auth: `resolveWinixAuthState`, `defaultWinixAuthProvider`
 - Session: `resolveWinixSession`, `defaultWinixAccountProvider`
-- Device: `defaultWinixDeviceClient`
+- Device: `createWinixDeviceClient(identityId)`
 - Constants: `WINIX_REFRESH_MARGIN_SECONDS`
+
+## Upgrading from 0.2.x
+
+Winix retired its previous Cognito client and changed its mobile protocol. Version
+0.3 uses the current public client, encrypted mobile requests, and identity-based
+device commands. The SDK continues to use Web Crypto and `fetch`; no Node shims,
+AWS SDK, Axios, or special Worker bundler aliases are needed.
+
+- Replace `defaultWinixDeviceClient` with `createWinixDeviceClient(session.identityId)`.
+- Persist `auth.idToken` alongside the existing tokens. Cached auth without it is
+  refreshed automatically; revoked refresh tokens fall back to full login.
+- `accessExpiresAt` remains epoch **seconds**.
+- Custom `WinixAccountProvider` handles now return `identityId` as well as `getDevices()`.
+- Device errors are checked inside HTTP 200 responses, including disconnected
+  devices. The live `S100` success response with an empty message is supported.
+
+AQI thresholds, hysteresis, dwell timing, device selection, and persistence belong
+in the consuming application.
 
 ## Development
 

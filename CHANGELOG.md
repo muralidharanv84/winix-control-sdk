@@ -1,5 +1,19 @@
 # winix-control-sdk
 
+## 0.3.0
+
+### Minor Changes
+
+- Restore Winix Smart 1.5.7 support with the public Cognito client, cached ID tokens,
+  encrypted mobile handshake, and account identity in device command URLs. Keep the
+  SDK free of runtime dependencies using Web Crypto and fetch.
+
+  Replace the obsolete defaultWinixDeviceClient with createWinixDeviceClient(session.identityId).
+  Custom account provider handles now expose identityId. Legacy token caches are
+  refreshed automatically, and device errors within HTTP 200 responses are rejected.
+  Remove retired client-secret hashing and duplicate JWT decoding, and normalize SRP
+  modular arithmetic and canonical challenge usernames.
+
 ## 0.2.1
 
 ### Patch Changes

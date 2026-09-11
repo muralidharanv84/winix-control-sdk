@@ -1,73 +1,33 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  defaultWinixDeviceClient,
-  resolveWinixSession,
-} from "../src/index";
-import type { StoredWinixAuthState } from "../src/types";
+import { afterEach, expect, it, vi } from "vitest";
+import { createWinixDeviceClient, resolveWinixAuthState, resolveWinixSession } from "../src/index";
+import { encryptMobilePayload } from "../src/mobile";
 import { buildJwt } from "./utils";
 
-function authState(): StoredWinixAuthState {
-  return {
-    userId: "user-1",
-    accessToken: buildJwt("user-1"),
-    refreshToken: "refresh-1",
-    accessExpiresAt: 999999,
-  };
-}
+afterEach(() => vi.restoreAllMocks());
 
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
-describe("sdk integration flow", () => {
-  it("resolves session and applies expected airflow target", async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ resultCode: "200" }), { status: 200 }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ resultCode: "200" }), { status: 200 }),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            resultCode: "200",
-            deviceInfoList: [{ deviceId: "device-1", deviceAlias: "Living" }],
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            body: {
-              data: [
-                {
-                  attributes: { A02: "0", A03: "01", A04: "01" },
-                },
-              ],
-            },
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValue(new Response("ok", { status: 200 }));
-
-    const session = await resolveWinixSession("u@example.com", authState());
-    const target = "turbo" as const;
-
-    expect(session.devices[0]?.deviceId).toBe("device-1");
-    const current = await defaultWinixDeviceClient.getState("device-1");
-    if (current.power !== "on") await defaultWinixDeviceClient.setPowerOn("device-1");
-    if (current.mode !== "manual") await defaultWinixDeviceClient.setModeManual("device-1");
-    if (current.airflow !== target) await defaultWinixDeviceClient.setAirflow("device-1", target);
-
-    expect(fetchSpy).toHaveBeenCalled();
-    const allUrls = fetchSpy.mock.calls.map((call) => String(call[0]));
-    expect(allUrls.some((url) => url.includes("/registerUser"))).toBe(true);
-    expect(allUrls.some((url) => url.includes("/A02:1"))).toBe(true);
-    expect(allUrls.some((url) => url.includes("/A03:02"))).toBe(true);
-    expect(allUrls.some((url) => url.includes("/A04:05"))).toBe(true);
+it("refreshes auth, establishes a session and applies a fan speed through the public API", async () => {
+  const accessToken = buildJwt("user-1");
+  const calls: string[] = [];
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = new URL(String(input));
+    calls.push(url.pathname);
+    if (url.hostname.startsWith("cognito-idp")) {
+      return Response.json({ AuthenticationResult: { AccessToken: accessToken, IdToken: "id-token", ExpiresIn: 3600 } });
+    }
+    if (url.hostname.startsWith("cognito-identity")) return Response.json({ IdentityId: "us-east-1:identity" });
+    if (url.hostname === "us.mobile.winix-iot.com") {
+      return new Response(await encryptMobilePayload({ resultCode: "200", deviceInfoList: [{ deviceId: "device-1" }] }));
+    }
+    return Response.json({ headers: { resultCode: "S100", resultMessage: "" } });
   });
+
+  const auth = await resolveWinixAuthState("u@example.com", "pw", {
+    userId: "user-1", accessToken, refreshToken: "refresh-token", accessExpiresAt: 0,
+  }, Math.floor(Date.now() / 1000));
+  const session = await resolveWinixSession("u@example.com", auth);
+  await createWinixDeviceClient(session.identityId).setAirflow(session.devices[0].deviceId, "high");
+  expect(calls).toEqual([
+    "/", "/", "/registerUser", "/init", "/checkAccessToken", "/getDeviceInfoList",
+    "/common/control/devices/device-1/us-east-1:identity/A04:03",
+  ]);
 });

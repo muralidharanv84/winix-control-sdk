@@ -1,8 +1,7 @@
 export const WINIX_REFRESH_MARGIN_SECONDS = 10 * 60;
 
-// Pulled from Winix Android app + existing open-source integrations.
-export const COGNITO_APP_CLIENT_ID = "14og512b9u20b8vrdm55d8empi";
-export const COGNITO_CLIENT_SECRET_KEY =
-  "k554d4pvgf2n0chbhgtmbe4q0ul4a9flp3pcl6a47ch6rripvvr";
+// Winix Smart 1.5.7 uses a public Cognito client (no client secret).
+export const COGNITO_APP_CLIENT_ID = "5rjk59c5tt7k9g8gpj0vd2qfg9";
 export const COGNITO_USER_POOL_ID = "us-east-1_Ofd50EosD";
 export const COGNITO_REGION = "us-east-1";
+export const COGNITO_IDENTITY_POOL_ID = "us-east-1:84008e15-d6af-4698-8646-66d05c1abe8b";
